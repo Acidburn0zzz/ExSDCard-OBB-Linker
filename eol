@@ -1,0 +1,136 @@
+#!/sbin/sh
+# EOL - ExSDCard OBB Linker - Magisk Module
+# Rom @XDA
+
+# Detect the boot mode (must be in normal boot)
+ps | grep zygote | grep -v grep >/dev/null && BOOTMODE=true || BOOTMODE=false
+$BOOTMODE || ps -A 2>/dev/null | grep zygote | grep -v grep >/dev/null && BOOTMODE=true
+$BOOTMODE || id | grep -q 'uid=0' || BOOTMODE=true
+
+# Exit script if running in boot mode
+if $BOOTMODE; then
+	echo -e "\nWelcome in ExSDCard OBB Linker menu :)"
+	
+fi
+
+EXSDCARD_LABEL=`blkid -s LABEL | cut -d "\"" -f2 | tail -1`
+EXSDCARD_NAME=`cat /proc/mounts | grep /storage/ | sed '1d' | awk '{ print $2 }' | sed '2d' | sed 's/\/storage\///'`
+EXSDCARD_TYPE=`blkid-s TYPE | cut -d "\"" -f2 | tail -1`
+MODDIR=/magisk/EOL
+EXTSTG=/storage/$EXSDCARD_LABEL
+EXOBBDIR=$EXTSTG/Android/obb/
+RESTORE=$MODDIR/restore
+OBBDATA=/data/media/obb/
+OBBEMULATED=/storage/emulated/0/obb/
+
+
+is_mounted /data || mount -o rw /data | echo "data partition is now mounted" || echo "Unable to mount the data partition" && exit 1
+if is_mounted $EXTSTG; then
+	exit 0
+else
+	echo -e "Try to mount manually the external sdcard\n!! No warranty that it will works !!"
+	mkdir -p $EXTSTG
+	chown sdcard_all:sdcard_all $EXTSTG
+	chmod 777 $EXTSTG
+	#ln -sf "/dev/block/$EXSDCARD_NAME" $EXTSTG
+	mount -o rw -t $EXSDCARD_TYPE $EXSDCARD_NAME /dev/block/
+	
+	wait 2
+	[ ! -d "$EXTSTG" ] | exit 1 | echo -e "EOL cannot continue because your external SDcard cannot be mounted manually" | exit 1 || echo -e "You external sdcard is now mounted.\nThe script can continue" | exit 0; fi
+fi
+
+Menu() {
+		echo -e "\n"
+		cat <<EOD
+		m) Move now .obb from internal to external storage
+		c) Move all .obb to a custom path
+		b) Backup all .obb to a zip file
+		k) Kill all apps that use .obb file(s)
+		r) Restore an .obb file(s)
+		a) About
+		x) Exit
+EOD
+			read Input
+			echo
+}
+
+Options() {
+		echo -e "Choose an option now\n"
+		Menu
+		
+		case "$Input" in
+			m ) move;;
+			c ) move_to_custom;;
+			b ) backup;;
+			k ) kills;;
+			r ) restore;;
+			a ) about;;
+			x ) close;;
+			* ) Menu;;
+		
+		esac
+}
+
+move() {
+	echo "OBB files will be moving to your external SDCard"
+	for dir in /data/media/obb/*/; [ ! -L "$dir" ] | ln -n $EXTSTG/Android/obb/$i /data/media/obb/$i; done
+	for dir in /storage/emulated/0/obb/; [ ! -L "$dir" ] | ln -n $EXTSTG/Android/obb/$x /storage/emulated/0/obb/$s; done
+
+	echo "Your .obb files has been moved to your external sdcard"
+}
+
+move_to_custom() {
+		read -p "To wich path do you want to move your .obb files ?" $custom_path
+		for dir in /data/media/obb/*/; [ ! -L "$dir" ] | ln -n $custom_path /data/media/obb/$dir; done
+		for dir in /storage/emulated/0/obb/*/; [ ! -L "$dir" ] | ln -n $custom_path /storage/emulated/0/obb/$dir; done
+		
+		echo "Your obb files has been moved to your custom path :)"		
+}
+
+backup() {
+		echo "All your obb files will be package to a zip file."
+		for dir in /data/media/obb/* ;do
+			[[ -d $dir ]] | zip -r /storage/${$EXSDCARD_LABEL/}/OBB_Backups/${$dir}.zip $dir; fi
+		done
+}
+
+kills() {
+		echo "This choice will kill all games process that actually runs on your device!"
+		
+		for dir in $EXTSTG/Android/obb/*/; do ps aux | grep -ie $dir | awk '{print $2}' | xargs kill -9 2>/dev/null
+		
+		echo " All your games process has been killed"		
+}
+
+restore() {
+		for dir in $EXTSTG/OBB_Backups/*/; do printf '%s\n' "$dir" > $RESTORE
+		CHOICE='There is the current avalaible backups:'
+		i=0
+		while read; do
+		printf $(( ++i )) "$RESTORE"
+		
+		read -p "Wich obb you want to restore (type the corresponding number)?" $num_choice
+		
+		user_choice=$(head -n${num_choice}$RESTORE)
+		echo -e "Restore process start, please wait..\n"
+		
+		mkdir -p $EXTSTG/Android/obb/$user_choice
+		unzip -o "$EXTSTG/OBB_Backups/$user_choice" -d $EXTSTG/Android/obb/ >&2
+		mkdir -p /storage/emulated/0/obb/$user_choice
+		find $EXTSTG/Android/obb/$user_choice type d -maxdepth 1 - ln -s /storage/emulated/0/obb/$user_choice {} \;
+		
+		[ -d "/storage/emulated/0/obb/$user_choice" ] | echo "The obb file has been restored :)" || echo "There is a problem with the restoration"
+		
+}
+
+about() {
+		echo -e "Module created by Rom to help poeple to managing the big .obb files\nof their video-games by move them on their external SDCard.\nAny contribution will be greatly appreciated.\nThis module works only with Magisk (v16 at least).\n\nEnjoy! :-)"
+}
+
+close() {
+		echo "Goodbye :)"
+		echo "Have a good day !"
+		exit 0
+}
+
+Menu

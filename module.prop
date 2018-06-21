@@ -1,0 +1,7 @@
+id=ExSDCard_OBB_Linker
+name=ExSDCard OBB Linker
+version=v1
+versionCode=1
+author=Rom
+description=Manage OBB files from internal to external SD Card by Magisk !
+minMagisk=1600

@@ -1,0 +1,105 @@
+#!/sbin/sh
+# ExSDCard OBB Linker by Rom
+
+[ -a /data/magisk.img ] | MAGIMG=/data/magisk.img || [ -a /data/adb/magisk.img ] | MAGIMG=/data/adb/magisk.img; fi
+
+MAIN=/tmp/script
+SCRIPT=80-linker.sh
+ADDON=/tmp/addon
+STATUS=/tmp/STATUS.prop
+TMPFHISTORY=/tmp/FileHistory.txt
+ADDOND=/system/addon.d
+ADDONDSH=/system/addon.d/80-linker.sh
+MAGISK=/magisk
+MODDIR=/magisk/ExSDCard_OBB
+TMPMODULE=/tmp/module.prop
+TMPPSFSDATA=/tmp/post-fs-data.sh
+INIT=/system/etc/init.d
+TMPSH=/tmp/linker.sh
+INITD=$INIT/80-linker
+SUD=/system/su.d
+SUDS=$SUD/$SCRIPT
+SSUD=/ssu/su.d
+SSUDS=$SSUD/$SCRIPT
+SUIMG=/data/su.img
+REMOVAL=/sdcard/linker.remove
+TOOLBOX=/system/bin/toolbox
+TOYBOX=/system/bin/toybox
+FIND=/system/bin/find
+
+CONF=/sdcard/detach.txt
+
+BAK=/sdcard/detach.bak
+MARKER=/tmp/marker
+PACKAGES=/sdcard/detach.custom
+
+##########################################################################################
+# Module setup
+##########################################################################################
+
+if [ -d /system ] && [ -d /data ] && [ -d /external_sd ]; then
+	
+	[ ! -a "$TOOLBOX" ] && [ ! -a "$TOYBOX" ] && [ ! -a "$FIND" ] | echo "System pre-requests aren't installed, please install Busybox and Toybox packages before continue !" | exit 1 || echo -e "System pre-requests are installed, module setup can continue\n"; fi
+	
+	for i in /data/media/obb/*/; do mv $i /ExSDCard/Android/obb/; done
+	ln -n /ExSDCard/Android/obb/$i /data/media/obb/$i/
+	
+	
+
+	
+	if [ -e "$MAGIMG" ]; then
+		mkdir $MAGISK
+			mount -t ext4 -o rw $MAGIMG $MAGISK
+			if [ ! -e $MODDIR ]; then 
+				mkdir $MODDIR
+				cp -f $TMPMODULE $MODDIR
+				cp -f $TMPPSFSDATA $MODDIR
+				chgrp -R 2000 $MODDIR
+				chmod -R 0755 $MODDIR
+			fi
+	fi
+	
+	if [ -e "$SUIMG" ]; then
+		mkdir /ssu
+			mount -t ext4 -o rw $SUIMG /ssu
+			if [ ! -e "$SSUD" ]; then 
+				mkdir $SSUD
+			fi
+			ls -1Ra /data/media/obb/**/*.obb > $SSUD/FileHistory.txt
+			cp $TMPSH $SSUD
+			cp -f $STATUS $SSUD
+			chgrp -R 2000 $SSUD
+			chmod -R 0755 $SSUD
+			find -path /data/media/obb/ -iname "*.obb" -exec ln -s {} 
+	fi
+	
+	if [ -e "$INIT" ]; then
+		if [ ! -d $ADDOND ]; then
+			mkdir $ADDOND
+		fi
+			ls -1Ra /data/media/obb/**/*.obb > $ADDOND/FileHistory.txt
+			cp $TMPSH $ADDONDSH
+			cp -f $STATUS $ADDONDSH
+			chgrp -R 2000 $ADDONDSH
+			chmod -R 0755 $ADDONDSH
+			find -path /data/media/obb/ -iname "*.obb" -exec ln -s {} 
+	fi
+	
+	if [ -a "$REMOVAL" ]; then
+		if [ -d $MAGIMG ]; then
+			rm -r $MODDIR
+		fi
+		if [ -d $INITD ]; then 
+			rm $INITD
+		fi
+		if [ -d $SUIMG ]; then
+			rm $SUDS
+		fi
+		if [ -d $ADDOND ]; then
+			rm $ADDONDSH
+		fi
+	fi
+
+	
+	;; 
+esac;
